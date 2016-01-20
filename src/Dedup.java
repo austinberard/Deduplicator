@@ -1,54 +1,58 @@
 import java.io.File;
-import java.io.FileFilter;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 public class Dedup {
-	private File folder;
+	private File targetDirectory;
 	private ArrayList<File> files;
-	private ArrayList<FileWrapper> filesWrapped;
-	private ArrayList<FileWrapper> dups;
 
 	public Dedup(String path) throws NoSuchAlgorithmException, IOException {
-		folder = new File(path);
-		FileFilter filter = new ExtentionFilter();
-		files = new ArrayList<File>(Arrays.asList(folder.listFiles(filter)));
-		dups = new ArrayList<FileWrapper>();
-		for(File f: files){
-			if(f.isDirectory()){
-				files.remove(f);
-			}
-		}
-		filesWrapped = new ArrayList<FileWrapper>();
+		targetDirectory = new File(path);
 		init();
 	}
 	
 	public void init() throws NoSuchAlgorithmException, IOException{
-		wrapFiles();
-		checkForDups();
-		removeDups();
+		files = new ArrayList<File>();
+		listAllFilesRecur(targetDirectory);
+		ArrayList<FileWrapper> filesWrapped = wrapFiles(files);
+		ArrayList<FileWrapper> duplicates = checkForDups(filesWrapped);
+		removeDups(duplicates);
 	}
 	
-	public void wrapFiles() throws NoSuchAlgorithmException, IOException{
-		for(int i = 0; i < files.size(); i++){
-			filesWrapped.add(new FileWrapper(files.get(i)));
-			
+	public void listAllFilesRecur(File directory) {
+		File[] folder = directory.listFiles();
+		for(int i = 0; i < folder.length; i++){
+			if(folder[i].isDirectory()){
+				listAllFilesRecur(folder[i]);
+			}
+			else{
+				files.add(folder[i]);
+			}
 		}
 	}
 	
-	public void checkForDups() throws NoSuchAlgorithmException, IOException {
-		for(int i = 0; i < filesWrapped.size(); i++){
-			for(int k = i+1; k < filesWrapped.size(); k++){
-				if(filesWrapped.get(i).getHash().equals(filesWrapped.get(k).getHash())){
-					dups.add(larger(filesWrapped.get(i), filesWrapped.get(k)));
+	public ArrayList<FileWrapper> wrapFiles(ArrayList<File> listOfFiles) throws NoSuchAlgorithmException, IOException{
+		ArrayList<FileWrapper> filesWrapped = new ArrayList<FileWrapper>();
+		for(int i = 0; i < listOfFiles.size(); i++){
+			filesWrapped.add(new FileWrapper(files.get(i)));
+			
+		}
+		return filesWrapped;
+	}
+	
+	public ArrayList<FileWrapper> checkForDups(ArrayList<FileWrapper> filesToCheck) throws NoSuchAlgorithmException, IOException {
+		ArrayList<FileWrapper> dups = new ArrayList<FileWrapper>();
+		for(int i = 0; i < filesToCheck.size(); i++){
+			for(int k = i+1; k < filesToCheck.size(); k++){
+				if(filesToCheck.get(i).getHash().equals(filesToCheck.get(k).getHash())){
+					dups.add(larger(filesToCheck.get(i), filesToCheck.get(k)));
 				}
 			}
 		}
 		if(dups.size() == 0){
 			System.out.println("No duplicate files were found ¯\\_(ツ)_/¯");
-			return;
+			return dups;
 		}
 		else{
 			System.out.println("A total of " + dups.size() + " duplicate files were found! \\_(•◡•)_/");
@@ -56,6 +60,7 @@ public class Dedup {
 			for(FileWrapper f: dups){
 				System.out.println(f.getFile().getName());
 			}
+		return dups;
 		}
 	}
 	
@@ -68,7 +73,7 @@ public class Dedup {
 		}
 	}
 	
-	public void removeDups() {
+	public void removeDups(ArrayList<FileWrapper> dups) {
 		for(FileWrapper f: dups){
 			System.out.println("Removing: " + f.getFile().getName());
 			f.getFile().delete();
